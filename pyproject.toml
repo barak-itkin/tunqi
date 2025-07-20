@@ -1,0 +1,77 @@
+[project]
+name = "tunqi"
+version = "0.1.0"
+description = "A convenient and extendable ORM for Python."
+authors = [
+    {name = "Dan Gittik", email = "dan.gittik@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "sqlalchemy[asyncio] (>=2.0.41,<3.0.0)",
+    "alembic (>=1.16.2,<2.0.0)",
+    "pydantic (>=2.11.7,<3.0.0)",
+    "srlz (>=0.1.0,<0.2.0)",
+    "sqlparse (>=0.5.3,<0.6.0)",
+    "inflect (>=7.5.0,<8.0.0)"
+]
+
+[project.optional-dependencies]
+sqlite = [
+    "aiosqlite (>=0.21.0,<1.0.0)",
+]
+postgresql = [
+    "asyncpg (>=0.30.0,<1.0.0)",
+    "psycopg2 (>=2.9.10,<3.0.0)"
+]
+mysql = [
+    "aiomysql (>=0.2.0,<1.0.0)",
+    "pymysql (>=1.1.1,<2)"
+]
+all = [
+    "aiosqlite (>=0.21.0,<1.0.0)",
+    "asyncpg (>=0.30.0,<1.0.0)",
+    "psycopg2 (>=2.9.10,<3.0.0)",
+    "aiomysql (>=0.2.0,<1.0.0)",
+    "pymysql (>=1.1.1,<2)"
+]
+debug = [
+    "rich (>=14.0.0,<15)"
+]
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.5"
+black = "^25.1.0"
+flake8 = "^7.2.0"
+isort = "^6.0.1"
+mypy = "^1.15.0"
+pytest-cov = "^6.1.1"
+poethepoet = "^0.33.1"
+click = "^8.2.1"
+pytest-asyncio = "^1.0.0"
+aiosqlite = "^0.21.0"
+asyncpg = "^0.30.0"
+psycopg2 = "^2.9.10"
+aiomysql = "^0.2.0"
+pymysql = "^1.1.1"
+cryptography = "^45.0.4"
+asyncmy = { version = "^0.2.10", markers = "python_version < '4.0'" }
+rich = "^14.0.0"
+pytest-xdist = "^3.8.0"
+
+[tool.poe.tasks]
+clean = "python dev.py clean"
+test = "python dev.py test"
+cov = "python dev.py cov"
+lint = "python dev.py lint"
+type = "python dev.py type"
+sync = "python dev.py sync"
+
+[[tool.mypy.overrides]]
+module = "sqlparse.*"
+ignore_missing_imports = true
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
