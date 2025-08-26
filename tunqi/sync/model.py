@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import pathlib
 from contextlib import contextmanager
-from functools import reduce
-from operator import or_
 from typing import (
     Any,
     Callable,
@@ -21,7 +19,7 @@ from pydantic import BaseModel
 from sqlalchemy import CursorResult, Executable
 
 from tunqi.core.expression import Expression
-from tunqi.core.query import Query, q
+from tunqi.core.query import Query
 from tunqi.core.selector import SelectorTypes
 from tunqi.core.table import Table
 from tunqi.orm.annotations import PK
@@ -129,16 +127,11 @@ class Model(BaseModel, metaclass=ModelType, abstract=True):
         return cls.config.database.count(cls.config.table_name, distinct=distinct, where=where, **query)
 
     @classmethod
-    def create(
-        cls,
-        *models: Model,
-        on_conflict: Iterable[str] | None = None,
-        update: SelectorTypes = None,
-    ) -> list[int]:
+    def create(cls, *models: Model) -> list[int]:
         cls.config.define()
         for n, model in enumerate(models, 1):
             cls._assert_model(n, model, exists=False)
-        return cls._create(*models, on_conflict=on_conflict, update=update)
+        return cls._create(*models)
 
     @classmethod
     def update(
@@ -185,8 +178,19 @@ class Model(BaseModel, metaclass=ModelType, abstract=True):
             if all(column in attributes for column in constraint):
                 unique.update(*constraint)
         model = cls(**attributes)
-        [model.pk] = cls.create(model, on_conflict=unique, update=False)
-        return model
+        state = model._dump_values()
+        pks = cls.config.database.insert(
+            cls.config.table_name,
+            state,
+            on_conflict=unique,
+            update=False,
+            return_pks=True,
+        )
+        if pks:
+            model.pk = pks[0]
+            model._set_state(state)
+            return model
+        return cls.get(**{column: attributes[column] for column in unique})
 
     @classmethod
     def get_fields(
@@ -349,12 +353,7 @@ class Model(BaseModel, metaclass=ModelType, abstract=True):
         pass
 
     @classmethod
-    def _create(
-        cls,
-        *models: Self,
-        on_conflict: Iterable[str] | None = None,
-        update: SelectorTypes = None,
-    ) -> list[int]:
+    def _create(cls, *models: Self) -> list[int]:
         states: list[dict[str, Any]] = []
         for model in models:
             model.before_save()
@@ -363,20 +362,10 @@ class Model(BaseModel, metaclass=ModelType, abstract=True):
         db = cls.config.database
         with db.transaction():
             try:
-                pks = db.insert(
-                    cls.config.table_name,
-                    *states,
-                    on_conflict=on_conflict,
-                    update=update,
-                    return_pks=True,
-                )
-                if len(pks) != len(models) and on_conflict:
-                    queries = [q(**{column: state[column] for column in on_conflict}) for state in states]
-                    fields = cls.all_fields(fields="pk", where=reduce(or_, queries))
-                    pks = [field["pk"] for field in fields]
-                for model, pk, state in zip(models, pks, states):
+                pks = db.insert(cls.config.table_name, *states, return_pks=True)
+                for pk, model, state in zip(pks, models, states):
                     model.pk = pk
-                    model._state = state
+                    model._set_state(state)
                     model.after_create()
                     model.after_save()
                 return pks

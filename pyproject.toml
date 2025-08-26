@@ -1,6 +1,6 @@
 [project]
 name = "tunqi"
-version = "0.1.1"
+version = "0.1.2"
 description = "A convenient and extendable ORM for Python."
 authors = [
     {name = "Dan Gittik", email = "dan.gittik@gmail.com"}

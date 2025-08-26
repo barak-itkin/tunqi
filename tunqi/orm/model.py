@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import pathlib
 from contextlib import asynccontextmanager
-from functools import reduce
-from operator import or_
 from typing import (
     Any,
     AsyncIterator,
@@ -23,7 +21,7 @@ from sqlalchemy import CursorResult, Executable
 
 from tunqi.core.database import Database
 from tunqi.core.expression import Expression
-from tunqi.core.query import Query, q
+from tunqi.core.query import Query
 from tunqi.core.selector import SelectorTypes
 from tunqi.core.table import Table
 from tunqi.orm.annotations import PK
@@ -130,16 +128,11 @@ class Model(BaseModel, metaclass=ModelType, abstract=True):
         return await cls.config.database.count(cls.config.table_name, distinct=distinct, where=where, **query)
 
     @classmethod
-    async def create(
-        cls,
-        *models: Model,
-        on_conflict: Iterable[str] | None = None,
-        update: SelectorTypes = None,
-    ) -> list[int]:
+    async def create(cls, *models: Model) -> list[int]:
         cls.config.define()
         for n, model in enumerate(models, 1):
             cls._assert_model(n, model, exists=False)
-        return await cls._create(*models, on_conflict=on_conflict, update=update)
+        return await cls._create(*models)
 
     @classmethod
     def update(
@@ -186,8 +179,19 @@ class Model(BaseModel, metaclass=ModelType, abstract=True):
             if all(column in attributes for column in constraint):
                 unique.update(*constraint)
         model = cls(**attributes)
-        [model.pk] = await cls.create(model, on_conflict=unique, update=False)
-        return model
+        state = model._dump_values()
+        pks = await cls.config.database.insert(
+            cls.config.table_name,
+            state,
+            on_conflict=unique,
+            update=False,
+            return_pks=True,
+        )
+        if pks:
+            model.pk = pks[0]
+            model._set_state(state)
+            return model
+        return await cls.get(**{column: attributes[column] for column in unique})
 
     @classmethod
     async def get_fields(
@@ -350,12 +354,7 @@ class Model(BaseModel, metaclass=ModelType, abstract=True):
         pass
 
     @classmethod
-    async def _create(
-        cls,
-        *models: Self,
-        on_conflict: Iterable[str] | None = None,
-        update: SelectorTypes = None,
-    ) -> list[int]:
+    async def _create(cls, *models: Self) -> list[int]:
         states: list[dict[str, Any]] = []
         for model in models:
             await model.before_save()
@@ -364,20 +363,10 @@ class Model(BaseModel, metaclass=ModelType, abstract=True):
         db = cls.config.database
         async with db.transaction():
             try:
-                pks = await db.insert(
-                    cls.config.table_name,
-                    *states,
-                    on_conflict=on_conflict,
-                    update=update,
-                    return_pks=True,
-                )
-                if len(pks) != len(models) and on_conflict:
-                    queries = [q(**{column: state[column] for column in on_conflict}) for state in states]
-                    fields = await cls.all_fields(fields="pk", where=reduce(or_, queries))
-                    pks = [field["pk"] for field in fields]
-                for model, pk, state in zip(models, pks, states):
+                pks = await db.insert(cls.config.table_name, *states, return_pks=True)
+                for pk, model, state in zip(pks, models, states):
                     model.pk = pk
-                    model._state = state
+                    model._set_state(state)
                     await model.after_create()
                     await model.after_save()
                 return pks

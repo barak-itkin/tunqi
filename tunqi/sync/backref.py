@@ -128,12 +128,7 @@ class BoundBackref[S: Model, T: Model]:
         query[self.backref.to] = self._assert_saved()
         return self.model.all_fields(fields, where=where, limit=limit, offset=offset, order=order, **query)
 
-    def create(
-        self,
-        *models: T,
-        on_conflict: Iterable[str] | None = None,
-        update: SelectorTypes = None,
-    ) -> list[int]:
+    def create(self, *models: T) -> list[int]:
         pk = self._assert_saved()
         fks: list[BoundFK[S, T]] = []
         fk_pks: list[int | None] = []
@@ -143,7 +138,7 @@ class BoundBackref[S: Model, T: Model]:
             fk_pks.append(fk.pk)
             fk.pk = pk
         try:
-            return self.model.create(*models, on_conflict=on_conflict, update=update)
+            return self.model.create(*models)
         except Exception:
             for fk, fk_pk in zip(fks, fk_pks):
                 fk.pk = fk_pk
