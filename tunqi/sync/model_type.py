@@ -139,6 +139,10 @@ class ModelConfig[T: Model]:
             "unique": list(self.unique),
         }
 
+    @cached_property
+    def unique_columns(self) -> set[str]:
+        return {name for name, column in self.schema["columns"].items() if column.get("unique")}
+
     @classmethod
     def extract_relations(self, attributes: dict[str, Any]) -> dict[str, Any]:
         annotations = attributes.setdefault("__annotations__", {})
@@ -162,6 +166,12 @@ class ModelConfig[T: Model]:
             return
         self.database.add_table(self.table_name, self.schema)
         self.defined = True
+        for fk in self.fks.values():
+            fk.model.config.define()
+        for backref in self.backrefs.values():
+            backref.model.config.define()
+        for m2m in self.m2ms.values():
+            m2m.model.config.define()
 
     def set_database(self, database: Database | None) -> None:
         self._database = database

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import pathlib
 from contextlib import asynccontextmanager
+from functools import reduce
+from operator import or_
 from typing import (
     Any,
     AsyncIterator,
@@ -21,7 +23,7 @@ from sqlalchemy import CursorResult, Executable
 
 from tunqi.core.database import Database
 from tunqi.core.expression import Expression
-from tunqi.core.query import Query
+from tunqi.core.query import Query, q
 from tunqi.core.selector import SelectorTypes
 from tunqi.core.table import Table
 from tunqi.orm.annotations import PK
@@ -176,8 +178,15 @@ class Model(BaseModel, metaclass=ModelType, abstract=True):
     @classmethod
     async def get_or_create(cls, /, **attributes: Any) -> Self:
         cls.config.define()
+        unique: set[str] = set()
+        for column in cls.config.unique_columns:
+            if column in attributes:
+                unique.add(column)
+        for constraint in cls.config.unique:
+            if all(column in attributes for column in constraint):
+                unique.update(*constraint)
         model = cls(**attributes)
-        await cls.create(model, on_conflict=attributes.keys(), update=False)
+        [model.pk] = await cls.create(model, on_conflict=unique, update=False)
         return model
 
     @classmethod
@@ -285,6 +294,7 @@ class Model(BaseModel, metaclass=ModelType, abstract=True):
         self.set(**self._state)
 
     async def save(self) -> Self:
+        self.config.define()
         if self.pk is None:
             await self._create(self)
         else:
@@ -294,10 +304,12 @@ class Model(BaseModel, metaclass=ModelType, abstract=True):
         return self
 
     async def delete(self) -> Self:
+        self.config.define()
         await self._delete(self)
         return self
 
     async def refresh(self) -> Self:
+        self.config.define()
         model_dict = await self.get_fields(self.pk)
         self._set(model_dict)
         return self
@@ -353,8 +365,16 @@ class Model(BaseModel, metaclass=ModelType, abstract=True):
         async with db.transaction():
             try:
                 pks = await db.insert(
-                    cls.config.table_name, *states, on_conflict=on_conflict, update=update, return_pks=True
+                    cls.config.table_name,
+                    *states,
+                    on_conflict=on_conflict,
+                    update=update,
+                    return_pks=True,
                 )
+                if len(pks) != len(models) and on_conflict:
+                    queries = [q(**{column: state[column] for column in on_conflict}) for state in states]
+                    fields = await cls.all_fields(fields="pk", where=reduce(or_, queries))
+                    pks = [field["pk"] for field in fields]
                 for model, pk, state in zip(models, pks, states):
                     model.pk = pk
                     model._state = state

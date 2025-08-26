@@ -133,11 +133,12 @@ def test_upsert() -> None:
     with pytest.raises(AlreadyExistsError, match="u with s 'foo' already exists"):
         u3.save()
     U.create(u3, on_conflict="s")
-    assert u3.pk is None
+    assert u3.pk == 1
     u = U.get(s="foo")
     assert u.pk == u1.pk
     assert u.n == 1
     assert u.b is True
+    u3.pk = None
     U.create(u3, on_conflict="s", update="n")
     assert u3.pk == u1.pk
     u = U.get(s="foo")

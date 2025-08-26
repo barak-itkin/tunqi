@@ -35,7 +35,7 @@ def print_event(event: AuditEvent, start_time: float | None = None, indent: int 
         print_(indent, f"[blue]Connection {connection_uid} ({connection_id})[/blue]")
     if "statement" in data:
         statement = data.pop("statement")
-        print_(indent, Syntax(statement, "sql", theme="monokai"))
+        print_(indent, Syntax(statement, "sql", theme="monokai", word_wrap=True))
     if data:
         print_(indent, data)
     for child in event.children:
