@@ -20,7 +20,7 @@ class M2M[T: Model]:
         self.model = model
 
     def __str__(self) -> str:
-        return f"many-to-many relation {self.source_model.config.name}.{self.name} <-> {self.model.config.name}"
+        return f"many-to-many relation {self.source_model._config.name}.{self.name} <-> {self.model._config.name}"
 
     def __repr__(self) -> str:
         return f"<{self}>"
@@ -41,10 +41,10 @@ class M2M[T: Model]:
 
     @cached_property
     def to(self) -> str:
-        for m2m in self.model.config.m2ms.values():
+        for m2m in self.model._config.m2ms.values():
             if m2m.model is self.source_model:
                 return m2m.name
-        return self.source_model.config.plural
+        return self.source_model._config.plural
 
 
 class BoundM2M[S: Model, T: Model]:
@@ -55,8 +55,8 @@ class BoundM2M[S: Model, T: Model]:
 
     def __str__(self) -> str:
         pk = self.source.pk or "?"
-        source = f"{self.m2m.source_model.config.name}[{pk}].{self.m2m.name}"
-        return f"many-to-many relation {source} <-> {self.m2m.model.config.name}"
+        source = f"{self.m2m.source_model._config.name}[{pk}].{self.m2m.name}"
+        return f"many-to-many relation {source} <-> {self.m2m.model._config.name}"
 
     def __repr__(self) -> str:
         return f"<{self}>"
@@ -124,15 +124,15 @@ class BoundM2M[S: Model, T: Model]:
     async def add(self, *models: T) -> int:
         source_pk = self._assert_saved()
         target_pks = self._assert_models(models)
-        return await self.source.config.database.link(
-            self.model.config.table_name, self.m2m.to, target_pks, [source_pk]
+        return await self.source._config.database.link(
+            self.model._config.table_name, self.m2m.to, target_pks, [source_pk]
         )
 
     async def remove(self, *models: T) -> int:
         source_pk = self._assert_saved()
         target_pks = self._assert_models(models)
-        return await self.source.config.database.unlink(
-            self.model.config.table_name, self.m2m.to, target_pks, [source_pk]
+        return await self.source._config.database.unlink(
+            self.model._config.table_name, self.m2m.to, target_pks, [source_pk]
         )
 
     @property
@@ -148,6 +148,6 @@ class BoundM2M[S: Model, T: Model]:
         pks: list[int] = []
         for n, model in enumerate(models, 1):
             if model.pk is None:
-                raise ValueError(f"can't use {model!r} (item #{n}) with a {self} (expected {self.model.config.name})")
+                raise ValueError(f"can't use {model!r} (item #{n}) with a {self} (expected {self.model._config.name})")
             pks.append(model.pk)
         return pks

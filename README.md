@@ -1044,9 +1044,9 @@ And just like setting a database, this option applies to all the subclasses of a
 particular models differently, we can always do:
 
 ```pycon
->>> User.config.set_database(other_db)
+>>> User._config.set_database(other_db)
 # And...
->>> User.config.set_deduplication(True/False)
+>>> User._config.set_deduplication(True/False)
 ```
 
 Which will similarly apply to *their* subtree – but that's a rare edge-case, really.
@@ -1085,7 +1085,7 @@ take care of it for us:
 ...     unique("email", "organization") # Email must be unique per-organization
 ```
 
-Such constraints are stored in `User.config.unique`, and if they're ever violated, a normalized, informative
+Such constraints are stored in `User._config.unique`, and if they're ever violated, a normalized, informative
 `AlreadyExistsError` is raised – regardless of whether we're using SQLite, PostgreSQL or MySQL (which you'd think is
 obvious – but they all have annoying different and indirect errors for this common and sensible case!).
 

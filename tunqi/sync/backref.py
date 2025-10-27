@@ -27,7 +27,7 @@ class Backref[T: Model]:
         self.model = model
 
     def __str__(self) -> str:
-        return f"backreference {self.source_model.config.name}.{self.name} -> {self.model.config.name}"
+        return f"backreference {self.source_model._config.name}.{self.name} -> {self.model._config.name}"
 
     def __repr__(self) -> str:
         return f"<{self}>"
@@ -48,10 +48,10 @@ class Backref[T: Model]:
 
     @cached_property
     def to(self) -> str:
-        for fk in self.model.config.fks.values():
+        for fk in self.model._config.fks.values():
             if fk.model is self.source_model:
                 return fk.name
-        raise ValueError(f"can't find foreign key to {self.source_model.config.name} in {self.model.config.name}")
+        raise ValueError(f"can't find foreign key to {self.source_model._config.name} in {self.model._config.name}")
 
 
 class BoundBackref[S: Model, T: Model]:
@@ -62,8 +62,8 @@ class BoundBackref[S: Model, T: Model]:
 
     def __str__(self) -> str:
         pk = self.source.pk or "?"
-        source = f"{self.backref.source_model.config.name}[{pk}].{self.backref.name}"
-        return f"backreference {source} -> {self.backref.model.config.name}"
+        source = f"{self.backref.source_model._config.name}[{pk}].{self.backref.name}"
+        return f"backreference {source} -> {self.backref.model._config.name}"
 
     def __repr__(self) -> str:
         return f"<{self}>"

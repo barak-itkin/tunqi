@@ -124,8 +124,8 @@ class ModelConfig[T: Model]:
         for base in self.model_class.__bases__:
             if not issubclass(base, ModelType.base):
                 continue
-            columns.update(base.config.schema["columns"])
-            self.unique.update(base.config.unique)
+            columns.update(base._config.schema["columns"])
+            self.unique.update(base._config.unique)
         for name, annotation in self.annotations.items():
             if name == Table.pk_name:
                 continue
@@ -155,8 +155,8 @@ class ModelConfig[T: Model]:
         db = self.database
         tables_names: list[str] = []
         for model_class in self.classes.values():
-            db.add_table(model_class.config.table_name, model_class.config.schema)
-            tables_names.append(model_class.config.table_name)
+            db.add_table(model_class._config.table_name, model_class._config.schema)
+            tables_names.append(model_class._config.table_name)
         return tables_names
 
     def define(self) -> None:
@@ -167,21 +167,21 @@ class ModelConfig[T: Model]:
         self.database.add_table(self.table_name, self.schema)
         self.defined = True
         for fk in self.fks.values():
-            fk.model.config.define()
+            fk.model._config.define()
         for backref in self.backrefs.values():
-            backref.model.config.define()
+            backref.model._config.define()
         for m2m in self.m2ms.values():
-            m2m.model.config.define()
+            m2m.model._config.define()
 
     def set_database(self, database: Database | None) -> None:
         self._database = database
         for cls in self.classes.values():
-            cls.config.set_database(database)
+            cls._config.set_database(database)
 
     def set_deduplication(self, deduplicate: bool) -> None:
         self._deduplicate = deduplicate
         for cls in self.classes.values():
-            cls.config.set_deduplication(deduplicate)
+            cls._config.set_deduplication(deduplicate)
 
     def deduplicate(self, model: T) -> T:
         if not self._deduplicate or not model.pk:
@@ -191,15 +191,15 @@ class ModelConfig[T: Model]:
         return self.instances[model.pk]
 
     def _bind(self) -> None:
-        self.model_class.config = self
-        if self.name in ModelType.base.config.classes:
+        self.model_class._config = self
+        if self.name in ModelType.base._config.classes:
             raise ValueError(f"model {self.name!r} already exists")
         # Now that we have the model class, we can also merge in any inherited relations.
         relations: dict[str, Any] = {}
         for baseclass in reversed(self.model_class.__mro__):
             if not issubclass(baseclass, ModelType.base):
                 continue
-            relations.update(baseclass.config._relations)
+            relations.update(baseclass._config._relations)
         self._relations = relations
         # At this point, some of the annotations will probably be forward references, because relations are inherently
         # circular:
@@ -219,7 +219,7 @@ class ModelConfig[T: Model]:
         for baseclass in reversed(self.model_class.__mro__):
             if not issubclass(baseclass, ModelType.base):
                 continue
-            baseclass.config.classes[self.name] = self.model_class
+            baseclass._config.classes[self.name] = self.model_class
 
     def _add_relation(self, name: str, annotation: Any) -> dict[str, Any]:
         relation = parse_relation(name, annotation)
@@ -230,7 +230,7 @@ class ModelConfig[T: Model]:
         unique = qualifiers.get("unique", False)
         index = qualifiers.get("index", False)
         target = ModelType.base.get_model(target_name)
-        table_name = target.config.table_name
+        table_name = target._config.table_name
         if nullable:
             raise ValueError(f"{relation_type} {name!r} cannot be nullable")
         if relation_type == FK.__name__:
@@ -265,12 +265,12 @@ class Relation:
         raise ValueError(f"can't set {self.name} directly")
 
     def _get_relation(self, model_class: type[Model], name: str) -> FK | Backref | M2M:
-        if name in model_class.config.fks:
-            return model_class.config.fks[name]
-        elif name in model_class.config.backrefs:
-            return model_class.config.backrefs[name]
+        if name in model_class._config.fks:
+            return model_class._config.fks[name]
+        elif name in model_class._config.backrefs:
+            return model_class._config.backrefs[name]
         else:
-            return model_class.config.m2ms[name]
+            return model_class._config.m2ms[name]
 
 
 def unique(*fields: str) -> None:
