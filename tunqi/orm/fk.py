@@ -16,7 +16,7 @@ class FK[T: Model]:
         self.model = model
 
     def __str__(self) -> str:
-        return f"foreign key {self.source_model.config.name}.{self.name} -> {self.model.config.name}"
+        return f"foreign key {self.source_model._config.name}.{self.name} -> {self.model._config.name}"
 
     def __repr__(self) -> str:
         return f"<{self}>"
@@ -51,8 +51,8 @@ class BoundFK[S: Model, T: Model]:
 
     def __str__(self) -> str:
         pk = self.source.pk or "?"
-        source = f"{self.fk.source_model.config.name}[{pk}].{self.fk.name}"
-        return f"foreign key {source} -> {self.fk.model.config.name}"
+        source = f"{self.fk.source_model._config.name}[{pk}].{self.fk.name}"
+        return f"foreign key {source} -> {self.fk.model._config.name}"
 
     def __repr__(self) -> str:
         return f"<{self}>"
@@ -100,7 +100,7 @@ class BoundFK[S: Model, T: Model]:
             pk = model
         else:
             if type(model) is not self.model:
-                raise ValueError(f"can't set {self} to {model!r} (expected {self.model.config.name})")
+                raise ValueError(f"can't set {self} to {model!r} (expected {self.model._config.name})")
             elif model.pk is None:
                 raise ValueError(f"can't set {self} to the unsaved {model}")
             object, pk = model, model.pk

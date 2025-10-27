@@ -31,10 +31,10 @@ class Tag(Model):
 
 @pytest.fixture
 def create_model(db: Database) -> Iterator[None]:
-    model_classes = Model.config.classes.copy()
+    model_classes = Model._config.classes.copy()
     Model.create_tables()
     yield
-    Model.config.classes = model_classes
+    Model._config.classes = model_classes
 
 
 @pytest.fixture

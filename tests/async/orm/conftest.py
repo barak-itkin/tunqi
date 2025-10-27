@@ -31,10 +31,10 @@ class F(BaseModel):
 
 @pytest_asyncio.fixture(autouse=True)
 async def db(db: Database, db_url: str) -> AsyncIterator[Database]:
-    model_classes = Model.config.classes.copy()
+    model_classes = Model._config.classes.copy()
     await Model.create_tables()
     yield db
-    Model.config.classes = model_classes
+    Model._config.classes = model_classes
 
 
 @pytest.fixture

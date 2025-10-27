@@ -31,7 +31,7 @@ from tunqi.utils import and_
 
 class Model(BaseModel, metaclass=ModelType, abstract=True):
 
-    config: ClassVar[ModelConfig]
+    _config: ClassVar[ModelConfig]
 
     pk: PK | None = None
     _state: dict[str, Any]
@@ -59,40 +59,40 @@ class Model(BaseModel, metaclass=ModelType, abstract=True):
 
     @classmethod
     def get_model(cls, name: str) -> type[Model]:
-        if name not in Model.config.classes:
-            raise ValueError(f"model {name!r} does not exist (available models are {and_(Model.config.classes)})")
-        return Model.config.classes[name]
+        if name not in Model._config.classes:
+            raise ValueError(f"model {name!r} does not exist (available models are {and_(Model._config.classes)})")
+        return Model._config.classes[name]
 
     @classmethod
     def use(cls, database: str | Database | None) -> None:
         if isinstance(database, str):
             database = Database(database)
-        cls.config.set_database(database)
+        cls._config.set_database(database)
 
     @classmethod
     def create_tables(cls) -> None:
-        table_names = cls.config.add_tables()
-        cls.config.database.create_tables(table_names)
+        table_names = cls._config.add_tables()
+        cls._config.database.create_tables(table_names)
 
     @classmethod
     def drop_tables(cls) -> None:
-        table_names = cls.config.add_tables()
-        cls.config.database.drop_tables(table_names)
+        table_names = cls._config.add_tables()
+        cls._config.database.drop_tables(table_names)
 
     @classmethod
     def make_migrations(cls, migrations_directory: str | pathlib.Path) -> None:
-        table_names = cls.config.add_tables()
-        cls.config.database.make_migrations(migrations_directory, table_names)
+        table_names = cls._config.add_tables()
+        cls._config.database.make_migrations(migrations_directory, table_names)
 
     @classmethod
     def migrate(cls, migrations_directory: str | pathlib.Path) -> None:
-        cls.config.add_tables()
-        cls.config.database.migrate(migrations_directory)
+        cls._config.add_tables()
+        cls._config.database.migrate(migrations_directory)
 
     @classmethod
     def get_table(cls) -> Table:
-        cls.config.define()
-        return cls.config.database.get_table(cls.config.table_name)
+        cls._config.define()
+        return cls._config.database.get_table(cls._config.table_name)
 
     @classmethod
     def execute(
@@ -102,16 +102,16 @@ class Model(BaseModel, metaclass=ModelType, abstract=True):
         *,
         autocommit: bool = False,
     ) -> Iterator[CursorResult]:
-        with cls.config.database.execute(statement, values, autocommit=autocommit) as cursor:
+        with cls._config.database.execute(statement, values, autocommit=autocommit) as cursor:
             yield cursor
 
     @classmethod
     def exists(cls, pk: int | None = None, /, *, where: Expression | Query | None = None, **query: Any) -> bool:
-        cls.config.define()
+        cls._config.define()
         if pk is not None:
             query[Table.pk_name] = pk
         query.update(cls.model_query())
-        return cls.config.database.exists(cls.config.table_name, where=where, **query)
+        return cls._config.database.exists(cls._config.table_name, where=where, **query)
 
     @classmethod
     def count(
@@ -122,13 +122,13 @@ class Model(BaseModel, metaclass=ModelType, abstract=True):
         where: Expression | Query | None = None,
         **query: Any,
     ) -> int:
-        cls.config.define()
+        cls._config.define()
         query.update(cls.model_query())
-        return cls.config.database.count(cls.config.table_name, distinct=distinct, where=where, **query)
+        return cls._config.database.count(cls._config.table_name, distinct=distinct, where=where, **query)
 
     @classmethod
     def create(cls, *models: Model) -> list[int]:
-        cls.config.define()
+        cls._config.define()
         for n, model in enumerate(models, 1):
             cls._assert_model(n, model, exists=False)
         return cls._create(*models)
@@ -141,7 +141,7 @@ class Model(BaseModel, metaclass=ModelType, abstract=True):
         where: Expression | Query | None = None,
         **query: Any,
     ) -> Callable[..., int]:
-        cls.config.define()
+        cls._config.define()
         return cls._update(*targets, where=where, **query)
 
     @classmethod
@@ -152,35 +152,35 @@ class Model(BaseModel, metaclass=ModelType, abstract=True):
         where: Expression | Query | None = None,
         **query: Any,
     ) -> int:
-        cls.config.define()
+        cls._config.define()
         return cls._delete(*targets, where=where, **query)
 
     @classmethod
     def get(cls, pk: int | None = None, /, *, where: Expression | Query | None = None, **query: Any) -> Self:
-        cls.config.define()
+        cls._config.define()
         if pk is not None:
             query[Table.pk_name] = pk
         query.update(cls.model_query())
-        model_dict = cls.config.database.select_one(cls.config.table_name, where=where, **query)
+        model_dict = cls._config.database.select_one(cls._config.table_name, where=where, **query)
         model = cls(**model_dict)
         model._set_state(model_dict)
-        model = cls.config.deduplicate(model)
+        model = cls._config.deduplicate(model)
         return model
 
     @classmethod
     def get_or_create(cls, /, **attributes: Any) -> Self:
-        cls.config.define()
+        cls._config.define()
         unique: set[str] = set()
-        for column in cls.config.unique_columns:
+        for column in cls._config.unique_columns:
             if column in attributes:
                 unique.add(column)
-        for constraint in cls.config.unique:
+        for constraint in cls._config.unique:
             if all(column in attributes for column in constraint):
                 unique.update(*constraint)
         model = cls(**attributes)
         state = model._dump_values()
-        pks = cls.config.database.insert(
-            cls.config.table_name,
+        pks = cls._config.database.insert(
+            cls._config.table_name,
             state,
             on_conflict=unique,
             update=False,
@@ -202,11 +202,11 @@ class Model(BaseModel, metaclass=ModelType, abstract=True):
         where: Expression | Query | None = None,
         **query: Any,
     ) -> dict[str, Any]:
-        cls.config.define()
+        cls._config.define()
         if pk is not None:
             query[Table.pk_name] = pk
         query.update(cls.model_query())
-        return cls.config.database.select_one(cls.config.table_name, fields=fields, where=where, **query)
+        return cls._config.database.select_one(cls._config.table_name, fields=fields, where=where, **query)
 
     @classmethod
     def all(
@@ -219,10 +219,10 @@ class Model(BaseModel, metaclass=ModelType, abstract=True):
         order: Iterable[str] | None = None,
         **query: Any,
     ) -> list[Self]:
-        cls.config.define()
+        cls._config.define()
         query.update(cls.model_query())
-        model_dicts = cls.config.database.select(
-            cls.config.table_name,
+        model_dicts = cls._config.database.select(
+            cls._config.table_name,
             where=where,
             limit=limit,
             offset=offset,
@@ -233,7 +233,7 @@ class Model(BaseModel, metaclass=ModelType, abstract=True):
         for model_dict in model_dicts:
             model = cls(**model_dict)
             model._set_state(model_dict)
-            model = cls.config.deduplicate(model)
+            model = cls._config.deduplicate(model)
             models.append(model)
         return models
 
@@ -249,10 +249,10 @@ class Model(BaseModel, metaclass=ModelType, abstract=True):
         order: Iterable[str] | None = None,
         **query: Any,
     ) -> list[dict[str, Any]]:
-        cls.config.define()
+        cls._config.define()
         query.update(cls.model_query())
-        return cls.config.database.select(
-            cls.config.table_name,
+        return cls._config.database.select(
+            cls._config.table_name,
             fields=fields,
             where=where,
             limit=limit,
@@ -263,7 +263,7 @@ class Model(BaseModel, metaclass=ModelType, abstract=True):
 
     @classmethod
     def refresh_all(cls, *targets: Model) -> None:
-        cls.config.define()
+        cls._config.define()
         pks, models_ = cls._assert_models(targets)
         models = {model.pk: model for model in models_}
         query: dict[str, Any] = {f"{Table.pk_name}__in": pks}
@@ -279,7 +279,7 @@ class Model(BaseModel, metaclass=ModelType, abstract=True):
     @override
     def model_dump(self, **kwargs: Any) -> dict[str, Any]:
         data = super().model_dump(**kwargs)
-        for fk_name in self.config.fks:
+        for fk_name in self._config.fks:
             fk_value = self.__dict__.get(fk_name)
             if isinstance(fk_value, Model | BoundFK):
                 data[fk_name] = fk_value.pk
@@ -297,7 +297,7 @@ class Model(BaseModel, metaclass=ModelType, abstract=True):
         self.set(**self._state)
 
     def save(self) -> Self:
-        self.config.define()
+        self._config.define()
         if self.pk is None:
             self._create(self)
         else:
@@ -307,12 +307,12 @@ class Model(BaseModel, metaclass=ModelType, abstract=True):
         return self
 
     def delete(self) -> Self:
-        self.config.define()
+        self._config.define()
         self._delete(self)
         return self
 
     def refresh(self) -> Self:
-        self.config.define()
+        self._config.define()
         model_dict = self.get_fields(self.pk)
         self._set(model_dict)
         return self
@@ -359,10 +359,10 @@ class Model(BaseModel, metaclass=ModelType, abstract=True):
             model.before_save()
             model.before_create()
             states.append(model._dump_values())
-        db = cls.config.database
+        db = cls._config.database
         with db.transaction():
             try:
-                pks = db.insert(cls.config.table_name, *states, return_pks=True)
+                pks = db.insert(cls._config.table_name, *states, return_pks=True)
                 for pk, model, state in zip(pks, models, states):
                     model.pk = pk
                     model._set_state(state)
@@ -410,21 +410,21 @@ class Model(BaseModel, metaclass=ModelType, abstract=True):
                         model.reset()
                 raise
 
-        return cls.config.database.update(cls.config.table_name, hook, where=where, **query)
+        return cls._config.database.update(cls._config.table_name, hook, where=where, **query)
 
     @classmethod
     def _delete(cls, *targets: int | Self | None, where: Expression | Query | None = None, **query: Any) -> int:
         pks, models = cls._assert_models(targets)
         for model in models:
             model.before_delete()
-        db = cls.config.database
+        db = cls._config.database
         with db.transaction():
             try:
                 if len(pks) == 1:
                     query[Table.pk_name] = pks[0]
                 elif pks:
                     query[f"{Table.pk_name}__in"] = pks
-                rowcount = db.delete(cls.config.table_name, where=where, **query)
+                rowcount = db.delete(cls._config.table_name, where=where, **query)
                 for model in models:
                     model.pk = None
                     model.after_delete()
@@ -445,8 +445,8 @@ class Model(BaseModel, metaclass=ModelType, abstract=True):
     @classmethod
     def _assert_model(cls, n: int, model: Model, exists: bool) -> int | None:
         count = f" (item #{n})" if n else ""
-        if model.config.table_name != cls.config.table_name:
-            raise ValueError(f"{model}{count} is a {model.config.table_name}, not a {cls.config.table_name}")
+        if model._config.table_name != cls._config.table_name:
+            raise ValueError(f"{model}{count} is a {model._config.table_name}, not a {cls._config.table_name}")
         if exists and model.pk is None:
             raise ValueError(f"{model}{count} doesn't exists")
         if not exists and model.pk is not None:
@@ -469,7 +469,7 @@ class Model(BaseModel, metaclass=ModelType, abstract=True):
         return pks, models
 
     def _assign_positional_args(self, args: tuple[Any, ...], data: dict[str, Any]) -> None:
-        columns = self.config.schema["columns"]
+        columns = self._config.schema["columns"]
         if len(args) > len(columns):
             raise ValueError(f"got {len(args)} positional arguments (expected at most {len(columns)})")
         for n, (column, arg) in enumerate(zip(columns, args), 1):
@@ -478,20 +478,20 @@ class Model(BaseModel, metaclass=ModelType, abstract=True):
             data[column] = arg
 
     def _extract_fks(self, data: dict[str, Any]) -> dict[str, Any]:
-        return {fk_name: data.pop(fk_name, None) for fk_name in self.config.fks}
+        return {fk_name: data.pop(fk_name, None) for fk_name in self._config.fks}
 
     def _assign_fks(self, fks: dict[str, Any]) -> None:
         for fk_name, fk_value in fks.items():
-            fk: FK[Model] = self.config.fks[fk_name]
+            fk: FK[Model] = self._config.fks[fk_name]
             if fk_value is None or isinstance(fk_value, int):
                 self.__dict__[fk_name] = fk_value
                 continue
             if isinstance(fk_value, fk.model):
                 if not fk_value.pk:
-                    raise ValueError(f"can't set {fk} to an unsaved {fk.model.config.name} ({fk_value})")
+                    raise ValueError(f"can't set {fk} to an unsaved {fk.model._config.name} ({fk_value})")
                 self.__dict__[fk_name] = fk_value
                 continue
-            raise ValueError(f"can't set {fk} to {fk_value!r} (expected PK or {fk.model.config.name})")
+            raise ValueError(f"can't set {fk} to {fk_value!r} (expected PK or {fk.model._config.name})")
 
     def _dump_values(self) -> dict[str, Any]:
         return self.model_dump(exclude={Table.pk_name})

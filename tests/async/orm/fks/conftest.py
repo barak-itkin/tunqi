@@ -31,10 +31,10 @@ class Tag(Model):
 
 @pytest_asyncio.fixture
 async def create_model(db: Database) -> AsyncIterator[None]:
-    model_classes = Model.config.classes.copy()
+    model_classes = Model._config.classes.copy()
     await Model.create_tables()
     yield
-    Model.config.classes = model_classes
+    Model._config.classes = model_classes
 
 
 @pytest_asyncio.fixture

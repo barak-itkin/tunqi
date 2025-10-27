@@ -30,10 +30,10 @@ class F(BaseModel):
 
 @pytest.fixture(autouse=True)
 def db(db: Database, db_url: str) -> Iterator[Database]:
-    model_classes = Model.config.classes.copy()
+    model_classes = Model._config.classes.copy()
     Model.create_tables()
     yield db
-    Model.config.classes = model_classes
+    Model._config.classes = model_classes
 
 
 @pytest.fixture
